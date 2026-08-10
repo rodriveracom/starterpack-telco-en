@@ -181,7 +181,13 @@ def check_config_files(report: Report) -> None:
         report.error("PyYAML not available", "make install")
         return
 
-    for name in ("agent.yml", "integrations.yml", "memory.yml", "responses.yml"):
+    for name in (
+        "agent.yml",
+        "integrations.yml",
+        "memory.yml",
+        "responses.yml",
+        "endpoints.yml",
+    ):
         path = PROJECT_ROOT / name
         if not path.is_file():
             report.error(f"{name} is missing", "Restore it from git: git checkout -- " + name)

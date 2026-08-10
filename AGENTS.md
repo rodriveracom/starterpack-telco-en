@@ -33,6 +33,9 @@ Run `make` alone for the grouped help screen.
 
 - Reference secrets only as env vars / `.env` — never commit keys
 - Do **not** add CALM v1 files (`domain.yml`, `config.yml`, flow YAMLs)
+- Keep a minimal `endpoints.yml` for platform services (NLG / model_groups);
+  do **not** wire classic `action_endpoint` / `actions_module` — tools live in
+  `tools/` via calm_v2 `@tool`
 - Keep each skill focused; compose with `@skill.<name>` when needed
 - Prefer progressive control: prose → tool constraints → scoped `if:` →
   verbatim `utter:` → ordered blocks only when order is the requirement

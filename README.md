@@ -238,6 +238,7 @@ No external telecom API is required.
 .
 ├── agent.yml
 ├── integrations.yml
+├── endpoints.yml
 ├── memory.yml
 ├── responses.yml
 │
@@ -284,6 +285,13 @@ Configures external integrations including:
 * Rasa Inspector
 * Deepgram speech-to-text
 * Deepgram text-to-speech
+
+### `endpoints.yml`
+
+Optional platform services still loaded by Rasa (NLG rephraser, `model_groups`,
+tracker/event broker stubs). LLM conversation routing and voice stay in
+`integrations.yml`. Do not add classic `action_endpoint` here — tools use
+calm_v2 `@tool` under `tools/`.
 
 ### `skills/`
 

@@ -53,6 +53,7 @@ Key files:
 
 - [`agent.yml`](../agent.yml) — persona (Telano) + voice flags
 - [`integrations.yml`](../integrations.yml) — OpenAI + Inspector with Deepgram ASR/TTS
+- [`endpoints.yml`](../endpoints.yml) — platform NLG / model_groups (not classic actions)
 - [`.env`](../.env.example) — secrets
 
 Paste set: [`snippets/step-00-scaffold/`](snippets/step-00-scaffold/)
