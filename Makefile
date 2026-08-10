@@ -1,141 +1,182 @@
-# Your Rasa version
-RASA_VERSION := 3.17.0
+# ==============================================================================
+# Telano — Voice Telecom Care Agent (Rasa Skills + Deepgram)
+# ==============================================================================
 
-# Port used by `make chat` to serve the chat widget
-CHAT_PORT := 8000
+# ------------------------------------------------------------------------------
+# Terminal colours
+# ------------------------------------------------------------------------------
+GREEN   := $(shell tput -Txterm setaf 2 2>/dev/null)
+YELLOW  := $(shell tput -Txterm setaf 3 2>/dev/null)
+BLUE    := $(shell tput -Txterm setaf 4 2>/dev/null)
+MAGENTA := $(shell tput -Txterm setaf 5 2>/dev/null)
+RED     := $(shell tput -Txterm setaf 1 2>/dev/null)
+RESET   := $(shell tput -Txterm sgr0 2>/dev/null)
 
-# Default e2e test path. Override to run a subset, e.g.
-#   make test TEST_PATH="tests/e2e_test_cases/billing_test_cases.yml"
-TEST_PATH ?= tests/
+# ------------------------------------------------------------------------------
+# Paths & runners
+# ------------------------------------------------------------------------------
+UV     := $(shell command -v uv 2>/dev/null)
+RUN    := uv run
+PYTHON := $(RUN) python
+RASA   := $(RUN) rasa
 
-# Load secrets (RASA_LICENSE, OPENAI_API_KEY) from a local .env if present, then
-# export them so they reach the docker `-e` flags below. .env is gitignored.
-# Format: plain KEY=value lines (no `export`, no surrounding quotes).
+# `.env` is included for presence checks inside Make only — it is deliberately
+# NOT exported. Make keeps literal quotes on values, and rasa loads `.env` with
+# `override=False`, so exporting here would shadow correctly parsed values.
+# scripts/verify_setup.py (python-dotenv) is the authority on env parsing.
 -include .env
-# Rasa expects RASA_LICENSE; accept RASA_PRO_LICENSE as an alias if that's what's set.
-RASA_LICENSE ?= $(RASA_PRO_LICENSE)
-export
 
-#####
-# Utility targets for help and variable inspection
-ECHO := @echo
+.DEFAULT_GOAL := help
 
-# List phony targets
-.PHONY: print-variables clean model inspect run chat test help $(HELP_CMDS)
+.PHONY: help check-uv env install verify validate train inspect run \
+        guard-env reset-db show-demo-data tutorial clean clean-all
 
-# Help (cross-platform)
-HELP_CMDS := help model inspect run chat clean test print-variables
-HELP_help    := Show available targets
-HELP_model   := Train and validate the Rasa model
-HELP_inspect := Launch Inspector + Rasa + actions and open it in the browser
-HELP_run     := Start the Rasa server only (API enabled, no UI)
-HELP_chat    := Launch chat widget + Rasa + actions and open it in the browser
-HELP_clean   := Remove build artifacts
-HELP_test    := Run end-to-end tests on the Rasa model
-HELP_print-variables := Print all Makefile variables
-# Print help text at parse time when `make help` is called
-ifeq ($(filter help,$(MAKECMDGOALS)),help)
-  $(info Available targets:)
-  $(foreach t,$(HELP_CMDS),$(info   $(t) -  $(HELP_$(t))))
-endif
-help: ; @
+# ==============================================================================
+# Help
+# ==============================================================================
+help: ## Show this help message
+	@echo ''
+	@echo '$(MAGENTA)Telano — Voice Telecom Care Agent (Rasa Skills + Deepgram)$(RESET)'
+	@echo ''
+	@echo '$(YELLOW)First-time setup (in order):$(RESET)'
+	@echo '  $(GREEN)make install$(RESET)          Install dependencies into .venv (uv)'
+	@echo '  $(GREEN)make env$(RESET)              Create .env from .env.example (never overwrites)'
+	@echo '  $(GREEN)make verify$(RESET)           Pre-flight check: keys, project, data, connectivity'
+	@echo '  $(GREEN)make train$(RESET)            Build the agent model'
+	@echo '  $(GREEN)make inspect$(RESET)          Talk to the agent (voice + text)'
+	@echo ''
+	@echo '$(YELLOW)Diagnostics:$(RESET)'
+	@echo '  $(GREEN)make verify$(RESET)           Full pre-flight diagnostics (start here if stuck)'
+	@echo '  $(GREEN)make validate$(RESET)         Fast skill/memory/tool validation only'
+	@echo ''
+	@echo '$(YELLOW)Run:$(RESET)'
+	@echo '  $(GREEN)make inspect$(RESET)          Inspector UI — speak or type to Telano'
+	@echo '  $(GREEN)make run$(RESET)              Start the agent API server on port 5005'
+	@echo ''
+	@echo '$(YELLOW)Demo data:$(RESET)'
+	@echo '  $(GREEN)make show-demo-data$(RESET)   Print Serena Williams bills and routers'
+	@echo '  $(GREEN)make reset-db$(RESET)         Reseed the demo telco DB from data/source/'
+	@echo ''
+	@echo '$(YELLOW)Tutorial:$(RESET)'
+	@echo '  $(GREEN)make tutorial$(RESET)         Show the live-session chapters and snippet paths'
+	@echo ''
+	@echo '$(YELLOW)Cleanup:$(RESET)'
+	@echo '  $(GREEN)make clean$(RESET)            Remove models, caches, demo db'
+	@echo '  $(GREEN)make clean-all$(RESET)        Also remove .venv (full reset)'
+	@echo ''
 
-print-variables: ## Print all Makefile variables
-	$(ECHO) "Makefile Variables:"
-	$(ECHO) "RASA_VERSION: $(RASA_VERSION)"
-	$(ECHO) "RASA_LICENSE: $(RASA_LICENSE)"
-	$(ECHO) "OPENAI_API_KEY: $(OPENAI_API_KEY)"
+# ==============================================================================
+# Setup
+# ==============================================================================
+check-uv:
+	@if [ -z "$(UV)" ]; then \
+		echo "$(RED)✗ uv not found.$(RESET)"; \
+		echo "$(YELLOW)  Install it:$(RESET) curl -LsSf https://astral.sh/uv/install.sh | sh"; \
+		echo "$(YELLOW)  Docs:$(RESET)       https://docs.astral.sh/uv/"; \
+		exit 1; \
+	fi
 
-#####
-# OS-specific settings
+env: ## Create .env from .env.example if it does not exist
+	@if [ -f .env ]; then \
+		echo "$(GREEN)✓ .env already exists — leaving it untouched.$(RESET)"; \
+	else \
+		cp .env.example .env; \
+		echo "$(GREEN)✓ Created .env from .env.example$(RESET)"; \
+		echo "$(YELLOW)  Now open .env and fill in:$(RESET)"; \
+		echo "    RASA_LICENSE      Rasa Pro Developer Edition license"; \
+		echo "    OPENAI_API_KEY    LLM for routing and conversation"; \
+		echo "    DEEPGRAM_API_KEY  Speech-to-text AND text-to-speech"; \
+	fi
 
-# Windows
-ifeq ($(OS), Windows_NT)
-  SHELL := powershell.exe
-  .SHELLFLAGS := -NoProfile -Command
-  MKDIR_LOG = powershell -NoProfile -Command "New-Item -ItemType Directory -Force logs | Out-Null"
-  CLEAN_LOGS = powershell -NoProfile -Command "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue .rasa\*, models\*, logs\*; Get-ChildItem -Recurse -Include *.pyc,*.pyo -Force | Remove-Item -Force -ErrorAction SilentlyContinue; Get-ChildItem -Recurse -Filter '*~' -Force | Remove-Item -Force -ErrorAction SilentlyContinue"
-  define RASA_DOCKER_MODEL
-    docker run --rm -v "$${PWD}:/app" \
-      -e RASA_LICENSE=$$env:RASA_LICENSE \
-      -e OPENAI_API_KEY=$$env:OPENAI_API_KEY \
-      rasa/rasa-pro:$(RASA_VERSION) $(1)
-  endef
-  define RASA_DOCKER
-    docker run -v "$${PWD}:/app" -p 5005:5005 \
-      -e RASA_LICENSE=$$env:RASA_LICENSE \
-      -e OPENAI_API_KEY=$$env:OPENAI_API_KEY \
-      rasa/rasa-pro:$(RASA_VERSION) $(1)
-  endef
-  # `make chat` pre-launch: serve the widget, then open it after a short delay.
-  CHAT_PRELAUNCH = Start-Process python -ArgumentList '-m','http.server','$(CHAT_PORT)','--directory','chatwidget' -WindowStyle Hidden; Start-Job { Start-Sleep 10; Start-Process 'http://localhost:$(CHAT_PORT)' } | Out-Null;
-  # `make inspect` pre-launch: open the Inspector after a short delay.
-  INSPECT_PRELAUNCH = Start-Job { Start-Sleep 10; Start-Process 'http://localhost:5005/webhooks/socketio/inspect.html' } | Out-Null;
-# MacOS and Linux
-else
-  SHELL := /bin/bash
-  .SHELLFLAGS := -eu -o pipefail -c
-  MKDIR_LOG = mkdir -p logs
-  CLEAN_LOGS = rm -rf .rasa/* models/* logs/* || true; find . -type f \( -name '*.py[co]' -o -name '*~' \) -delete
-  define RASA_DOCKER_MODEL
-    docker run --rm \
-      --user $$(id -u):$$(id -g) \
-      -v "$$(pwd):/app" \
-      -e RASA_LICENSE="$$RASA_LICENSE" \
-      -e OPENAI_API_KEY="$$OPENAI_API_KEY" \
-      rasa/rasa-pro:$(RASA_VERSION) $(1)
-  endef
-  define RASA_DOCKER
-    docker run \
-      --user $$(id -u):$$(id -g) \
-      -v "$$(pwd):/app" \
-      -p 5005:5005 \
-      -e RASA_LICENSE="$$RASA_LICENSE" \
-      -e OPENAI_API_KEY="$$OPENAI_API_KEY" \
-      rasa/rasa-pro:$(RASA_VERSION) $(1)
-  endef
-  # Pick the right "open URL" command: open on macOS, xdg-open on Linux.
-  OPEN_URL := $(shell command -v open >/dev/null 2>&1 && echo open || echo xdg-open)
-  # `make chat` pre-launch: serve the widget in the background, open it once the
-  # Rasa server answers on :5005 (so the greeting fires), and stop the widget
-  # server on exit. Ends with `&` so the docker run that follows is foreground.
-  CHAT_PRELAUNCH = python3 -m http.server $(CHAT_PORT) --directory chatwidget >logs/widget.log 2>&1 & WIDGET_PID=$$!; trap 'kill $$WIDGET_PID 2>/dev/null' EXIT INT TERM; ( for _ in $$(seq 1 90); do curl -sf -o /dev/null http://localhost:5005/ && break; sleep 1; done; $(OPEN_URL) "http://localhost:$(CHAT_PORT)" ) &
-  # `make inspect` pre-launch: open the Inspector once Rasa answers on :5005.
-  INSPECT_PRELAUNCH = ( for _ in $$(seq 1 90); do curl -sf -o /dev/null http://localhost:5005/ && break; sleep 1; done; $(OPEN_URL) "http://localhost:5005/webhooks/socketio/inspect.html" ) &
-endif
+install: check-uv ## Install all dependencies into .venv
+	@echo "$(BLUE)Installing dependencies with uv...$(RESET)"
+	$(UV) sync --prerelease=allow
+	@echo "$(GREEN)✓ Dependencies installed.$(RESET)"
+	@echo "$(YELLOW)  Next:$(RESET) make env && make verify"
 
-#####
-# Remove Rasa model, and log files, and clean up Python cache files
-clean:
-	$(ECHO) "Cleaning files..."
-	$(CLEAN_LOGS)
+guard-env:
+	@if [ ! -f .env ]; then \
+		echo "$(RED)✗ No .env file found.$(RESET)"; \
+		echo "$(YELLOW)  Run:$(RESET) make env      (creates it from .env.example)"; \
+		echo "$(YELLOW)  Then:$(RESET) make verify  (checks your keys)"; \
+		exit 1; \
+	fi
 
-# Train and validate the Rasa model
-model:
-	$(ECHO) "Training Rasa model..."
-	$(call RASA_DOCKER_MODEL, train)
+# ==============================================================================
+# Diagnostics
+# ==============================================================================
+verify: check-uv ## Run full pre-flight diagnostics
+	@$(PYTHON) scripts/verify_setup.py
 
-# Start the Rasa Inspector (Rasa server + in-process actions) and open it.
-inspect:
-	$(ECHO) "Starting Rasa Inspector (Rasa + in-process actions). Ctrl+C to stop..."
-	@$(MKDIR_LOG)
-	@$(INSPECT_PRELAUNCH) $(call RASA_DOCKER, inspect --debug --log-file logs/logs.out)
+validate: check-uv guard-env ## Validate skills, memory, and tools (fast)
+	@echo "$(BLUE)Validating agent project...$(RESET)"
+	@$(PYTHON) -c "from pathlib import Path; from rasa.calm_v2.validation import validate_project; validate_project(Path('.')); print('OK')" \
+		>/dev/null 2>&1 \
+		&& echo "$(GREEN)✓ Project is valid.$(RESET)" \
+		|| ( echo "$(RED)✗ Project validation failed. Details:$(RESET)"; \
+		     $(PYTHON) -c "from pathlib import Path; from rasa.calm_v2.validation import validate_project; validate_project(Path('.'))" 2>&1 | grep -v '^20' | tail -40; \
+		     exit 1 )
 
-# Start the Rasa server with logging enabled
-run:
-	$(ECHO) "Starting Rasa Server with logging..."
-	@$(MKDIR_LOG)
-	$(call RASA_DOCKER, run --debug --log-file logs/logs.out --enable-api --cors "*")
+# ==============================================================================
+# Build & run
+# ==============================================================================
+train: check-uv guard-env ## Validate and package the agent model
+	@echo "$(BLUE)Training the agent...$(RESET)"
+	$(RASA) train
+	@echo "$(GREEN)✓ Model ready.$(RESET)  Next: $(GREEN)make inspect$(RESET)"
 
-# Start everything for the demo in one command: the Rasa server (with in-process
-# actions) plus the chat widget, then open the widget once Rasa is ready.
-# Ctrl+C stops both.
-chat:
-	$(ECHO) "Starting chat widget + Rasa (with in-process actions). Ctrl+C to stop..."
-	@$(MKDIR_LOG)
-	@$(CHAT_PRELAUNCH) $(call RASA_DOCKER, run --debug --log-file logs/logs.out --enable-api --cors "*")
+inspect: check-uv guard-env ## Open the Inspector (voice + text)
+	@echo "$(MAGENTA)Opening the Inspector — use the mic for voice, or type.$(RESET)"
+	$(RASA) inspect
 
-# Run end-to-end tests on the Rasa model (override TEST_PATH to run a subset)
-test:
-	$(ECHO) "Testing Rasa model..."
-	$(call RASA_DOCKER, test e2e $(TEST_PATH))
+run: check-uv guard-env ## Start the agent API server
+	@echo "$(MAGENTA)Starting the agent on port 5005...$(RESET)"
+	$(RASA) run --enable-api
+
+# ==============================================================================
+# Demo data
+# ==============================================================================
+show-demo-data: check-uv ## Print the demo customer's bills and routers
+	@$(PYTHON) scripts/show_demo_data.py
+
+reset-db: ## Delete the demo telco DB so it reseeds from data/source/
+	@rm -f data/telco.db
+	@echo "$(GREEN)✓ Demo telco DB reset — it will reseed on the next tool call.$(RESET)"
+
+# ==============================================================================
+# Tutorial
+# ==============================================================================
+tutorial: ## Show the live-session chapters and where the snippets live
+	@echo ''
+	@echo '$(MAGENTA)Build-with-me: Voice telecom care agent$(RESET)'
+	@echo ''
+	@echo '$(YELLOW)Guides:$(RESET)'
+	@echo '  tutorial/TUTORIAL.md    Audience-facing walkthrough'
+	@echo '  tutorial/PRESENTER.md   Timing, recovery, and skip paths'
+	@echo '  tutorial/TAGS.md        Checkpoint tags for live recovery'
+	@echo ''
+	@echo '$(YELLOW)Chapters (paste-ready files per step):$(RESET)'
+	@echo '  $(GREEN)0$(RESET)  Scaffold a voice Skills project   tutorial/snippets/step-00-scaffold/'
+	@echo '  $(GREEN)1$(RESET)  First skill: FAQ in prose         tutorial/snippets/step-01-faq/'
+	@echo '  $(GREEN)2$(RESET)  First tool: check bill             tutorial/snippets/step-02-check-bill/'
+	@echo '  $(GREEN)3$(RESET)  First guarantee: constraints      tutorial/snippets/step-03-tool-constraints/'
+	@echo '  $(GREEN)4$(RESET)  Router reset showcase             tutorial/snippets/step-04-reset-router/'
+	@echo '  $(GREEN)5$(RESET)  Composition: internet care       tutorial/snippets/step-05-internet/'
+	@echo '  $(GREEN)6$(RESET)  Remaining skills (fast-forward)   tutorial/snippets/step-06-remaining/'
+	@echo '  $(GREEN)7$(RESET)  Voice pass with Deepgram          make inspect'
+	@echo '  $(GREEN)8$(RESET)  Flywheel close                    tutorial/TUTORIAL.md'
+	@echo ''
+
+# ==============================================================================
+# Cleanup
+# ==============================================================================
+clean: ## Remove models, caches, and the generated demo db
+	@echo "$(YELLOW)Cleaning build artefacts...$(RESET)"
+	@rm -rf models .rasa logs data/telco.db
+	@find . -name '__pycache__' -type d -not -path './.venv/*' -not -path './.ref-banking/*' -exec rm -rf {} + 2>/dev/null || true
+	@find . -name '*.pyc' -not -path './.venv/*' -not -path './.ref-banking/*' -delete 2>/dev/null || true
+	@echo "$(GREEN)✓ Clean complete.$(RESET)"
+
+clean-all: clean ## Also remove the virtualenv (full reset)
+	@rm -rf .venv
+	@echo "$(GREEN)✓ Removed .venv — run $(RESET)make install$(GREEN) to start over.$(RESET)"

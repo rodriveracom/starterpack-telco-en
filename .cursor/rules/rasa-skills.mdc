@@ -1,0 +1,56 @@
+---
+description: Rasa Maestro Skills conventions for the Telano voice telecom agent
+globs:
+  - skills/**/*
+  - tools/**/*
+  - lib/**/*
+  - agent.yml
+  - integrations.yml
+  - memory.yml
+  - responses.yml
+  - Makefile
+  - scripts/**/*
+alwaysApply: false
+---
+
+# Rasa Skills / Maestro (Telano)
+
+This repo is a **calm_v2 / Maestro Skills** project. Do not introduce CALM v1
+artifacts (`config.yml`, `domain.yml`, flow YAMLs under `data/`, classic
+`credentials.yml` / `endpoints.yml`).
+
+## First commands
+
+```bash
+make verify
+make train
+make inspect
+```
+
+Prefer `make` targets over raw `uv run rasa …`.
+
+## Layout
+
+- Root: `agent.yml`, `integrations.yml`, `memory.yml`, `responses.yml`
+- One skill per folder under `skills/<id>/`
+- Shared tools in `tools/telco.py` via `import_tools`
+- Demo backend in `lib/database.py` + `data/source/*.json`
+
+## Progressive control order
+
+prose → `tool_constraints` → scoped `if:` → verbatim `utter:` → `ordered_block`
+
+Showcase skill: `reset_router` (remote factory reset).
+
+## Skill authoring rules
+
+- Boolean `if:` expressions use Python `True`/`False`, not YAML booleans
+- `description:` only on llm_settable / collect-owned memory fields
+- Side effects need confirmation (`requires_confirmation`) when irreversible
+- Keep voice copy short
+- Compose with `@skill.<name>` instead of growing monolithic skills
+
+## Secrets
+
+Never commit `.env`. Document vars only in `.env.example`.
+Makefile may `-include .env` for presence checks but must **not** `export` it.
