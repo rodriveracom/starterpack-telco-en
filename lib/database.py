@@ -163,6 +163,20 @@ def resolve_customer_id(context_customer_id: Optional[str] = None) -> str:
     return DEMO_CUSTOMER_ID
 
 
+def username_from_context(context=None) -> str:
+    """Resolve the active customer display name from project memory."""
+    if context is None:
+        return DEMO_USERNAME
+    return resolve_username(context.memory.get("username"))
+
+
+def customer_id_from_context(context=None) -> str:
+    """Resolve the active customer id from project memory."""
+    if context is None:
+        return DEMO_CUSTOMER_ID
+    return resolve_customer_id(context.memory.get("customer_id"))
+
+
 def get_customer_by_name(db: Database, username: str) -> Optional[Tuple]:
     return db.run_query(
         """

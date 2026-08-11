@@ -4,14 +4,11 @@ description: >
   Help customers fix slow internet by running diagnostics, guiding a router
   reboot, and escalating to a remote factory reset when needed. Activate for
   slow internet, buffering, poor Wi-Fi, or connection problems.
-import_tools:
-  - load_customer_profile
-  - run_speed_test
 ---
 
 Help the customer fix slow internet. Do not invent speeds or device ids.
 
-If username is missing, call `@tool.load_customer_profile`.
+The demo customer profile is already loaded at session start.
 
 Acknowledge the issue briefly. Then invoke `@skill.run_diagnostics` so a real
 speed test runs.

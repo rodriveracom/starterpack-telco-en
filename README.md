@@ -18,7 +18,8 @@ This repository is designed to be useful in two ways:
 
 | Skill | Capability |
 | --- | --- |
-| `intro` | Introduce Telano and orient the customer |
+| `intro` | Orient the customer / explain capabilities |
+| `default_session_start` | Load Serena Williams, then greet (engine-managed) |
 | `telco_faq` | Answer common telecom questions from reference material |
 | `check_bill` | Summarize a monthly bill and optionally list charges |
 | `run_diagnostics` | Run a network speed test |
@@ -98,7 +99,7 @@ That makes this repository useful both as a telecom demo and as a reference for 
 
 You need:
 
-* **Python 3.11 or 3.12**
+* **Python 3.10–3.13**
 * [`uv`](https://docs.astral.sh/uv/)
 * a Rasa Pro Developer Edition license
 * an OpenAI API key
@@ -243,6 +244,7 @@ No external telecom API is required.
 ├── responses.yml
 │
 ├── skills/
+│   ├── default_session_start/
 │   ├── intro/
 │   ├── telco_faq/
 │   ├── check_bill/
@@ -300,7 +302,9 @@ One folder per skill. Each skill starts from `skill.md` and may include
 
 ### `tools/`
 
-Shared `@tool` functions imported by skills via `import_tools`.
+Shared `@tool` functions used by **two or more skills** or by session start,
+imported via `import_tools`. Single-skill tools live in `skills/<id>/tools.py`
+and are auto-discovered (no `import_tools`).
 
 ### `lib/` + `data/source/`
 
@@ -385,9 +389,10 @@ Common fixes are printed inline by the verifier (`make install`, `make env`,
 Pinned in `pyproject.toml`:
 
 ```text
-rasa-pro==3.19.0.dev2
+rasa-pro==3.19.0.dev3
 ```
 
+LLM: `gpt-5.2` in `integrations.yml` and `endpoints.yml` — do not set `temperature`.
 Install with:
 
 ```bash

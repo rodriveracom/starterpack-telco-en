@@ -33,9 +33,10 @@
 make show-demo-data
 ```
 
-- Customer: **Serena Williams** / id `123`
+- Customer: **Serena Williams** / id `123` (loaded by `default_session_start`)
 - February bill: **$55.00** Internet
 - Router: **RTR-123-01** RasaGate Fiber X1
+- Factory-reset tool name: **`factory_reset_router`** (skill remains `reset_router`)
 
 ## Escape hatches
 

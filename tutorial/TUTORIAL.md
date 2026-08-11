@@ -52,8 +52,9 @@ run.
 Key files:
 
 - [`agent.yml`](../agent.yml) — persona (Telano) + voice flags
-- [`integrations.yml`](../integrations.yml) — OpenAI + Inspector with Deepgram ASR/TTS
+- [`integrations.yml`](../integrations.yml) — OpenAI `gpt-5.2` + Inspector Deepgram ASR/TTS
 - [`endpoints.yml`](../endpoints.yml) — platform NLG / model_groups (not classic actions)
+- [`skills/default_session_start/`](../skills/default_session_start/) — load profile then `utter_greet`
 - [`.env`](../.env.example) — secrets
 
 Paste set: [`snippets/step-00-scaffold/`](snippets/step-00-scaffold/)
@@ -88,8 +89,9 @@ Try: “What is the difference between rebooting and resetting a router?”
 
 ## Step 2 — First tool: check bill (10 min)
 
-**Teach:** Tools are Python functions with `@tool`. They are auto-discovered from
-`tools/` (shared) or `skills/<name>/tools.py`.
+**Teach:** Tools are Python functions with `@tool`. Prefer skill-local
+`skills/<name>/tools.py` (auto-discovered). Only shared tools live in `tools/`
+and use `import_tools`. Reference tools in plain prose — there is no `@tool.` token.
 
 Paste set: [`snippets/step-02-check-bill/`](snippets/step-02-check-bill/)
 
@@ -138,7 +140,8 @@ Paste set: [`snippets/step-04-reset-router/`](snippets/step-04-reset-router/)
 Try (voice if possible): “Please factory-reset my router.”
 
 **Verify:** Reset warning plays, confirmation is required before the remote
-reset, Wi-Fi name becomes `TelecomOfRasa-Setup`.
+reset, Wi-Fi name becomes `TelecomOfRasa-Setup`. Tool name is
+`factory_reset_router` (not the same as the skill id).
 
 Demo router: `RTR-123-01` (RasaGate Fiber X1)
 
@@ -162,6 +165,7 @@ factory reset is offered only after reboot fails to restore speed.
 
 For live timing, copy the finished folders rather than rebuilding:
 
+- `skills/default_session_start`
 - `skills/intro`
 - `skills/check_bill` (if not already pasted)
 - `skills/telco_faq`
@@ -211,11 +215,12 @@ Suggested spoken script:
 
 | Capability | Skill |
 |---|---|
-| Greeting / orientation | `intro` + session greeting |
+| Session open / identity | `default_session_start` |
+| Orientation | `intro` |
 | Bill lookup | `check_bill` |
 | Speed diagnostics | `run_diagnostics` |
 | User reboot guidance | `reboot_router` |
-| Remote factory reset | `reset_router` |
+| Remote factory reset | `reset_router` (`factory_reset_router` tool) |
 | Slow-internet journey | `internet_troubleshooting` (+ composition) |
 | FAQ | `telco_faq` |
 | Human handoff | `human_handoff` |

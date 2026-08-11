@@ -6,12 +6,9 @@ description: >
   Activate for factory reset, remote reset, wipe router settings, or reset after
   reboot failed.
 import_tools:
-  - load_customer_profile
-  - list_routers
-  - reset_router
   - run_speed_test
 tool_constraints:
-  - reset_router:
+  - factory_reset_router:
       requires: session.reset_router.selected_device_id
       requires_confirmation:
         enabled: true
@@ -30,7 +27,7 @@ utter:
 Help the customer factory-reset a router. This is irreversible for custom
 settings. Do not invent device ids.
 
-If username is missing, call `@tool.load_customer_profile`.
+The demo customer profile is already loaded at session start.
 
 ## Identify the reason
 
@@ -56,19 +53,19 @@ steps:
 
 if: session.reset_router.reset_reason == "still_slow_after_reboot"
 Explain that a factory reset is the next step after a reboot failed.
-Call `@tool.reset_router` with the selected device. Offer a post-reset speed test.
+Call factory_reset_router with the selected device. Offer a post-reset speed test.
 
 if: session.reset_router.reset_reason == "wifi_broken" or session.reset_router.reset_reason == "unknown_settings"
 Explain that custom Wi-Fi settings will be wiped and restored to TelecomOfRasa-Setup.
-Call `@tool.reset_router`. Remind them to reconnect devices afterward.
+Call factory_reset_router. Remind them to reconnect devices afterward.
 
 if: session.reset_router.reset_reason == "moving" or session.reset_router.reset_reason == "other"
-Confirm they understand settings will be erased, then call `@tool.reset_router`.
+Confirm they understand settings will be erased, then call factory_reset_router.
 
 ## After reset
 
 if: session.reset_router.router_reset == True
-Offer to run diagnostics again. If they agree, call `@tool.run_speed_test` and
+Offer to run diagnostics again. If they agree, call run_speed_test and
 report the new speed in one or two short sentences.
 
 ## Close

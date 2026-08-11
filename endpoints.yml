@@ -25,9 +25,8 @@ model_groups:
   - id: openai-llm
     models:
       - provider: openai
-        model: gpt-4.1-mini
+        model: gpt-5.2
         api_key: ${OPENAI_API_KEY}
-        temperature: 0.0
   - id: openai-embeddings
     models:
       - provider: openai
@@ -67,4 +66,4 @@ model_groups:
 #  service_name: telano
 
 # NOTE: Do not add a classic `action_endpoint` / `actions_module` here.
-# Side effects use calm_v2 `@tool` functions under tools/, not rasa-sdk actions.
+# Side effects use calm_v2 `@tool` functions under tools/ and skills/*/tools.py.

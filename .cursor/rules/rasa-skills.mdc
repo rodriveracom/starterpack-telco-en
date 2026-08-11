@@ -6,6 +6,7 @@ globs:
   - lib/**/*
   - agent.yml
   - integrations.yml
+  - endpoints.yml
   - memory.yml
   - responses.yml
   - Makefile
@@ -20,6 +21,9 @@ artifacts (`config.yml`, `domain.yml`, flow YAMLs under `data/`, classic
 `credentials.yml`). Keep `endpoints.yml` as a thin platform file (NLG /
 `model_groups` only) — never add classic `action_endpoint` / `actions_module`.
 
+Scaffold new projects with `rasa init --engine maestro` (there is no
+`--template voice`).
+
 ## First commands
 
 ```bash
@@ -32,24 +36,34 @@ Prefer `make` targets over raw `uv run rasa …`.
 
 ## Layout
 
-- Root: `agent.yml`, `integrations.yml`, `memory.yml`, `responses.yml`
+- Root: `agent.yml`, `integrations.yml`, `endpoints.yml`, `memory.yml`, `responses.yml`
 - One skill per folder under `skills/<id>/`
-- Shared tools in `tools/telco.py` via `import_tools`
+- Session opener: `skills/default_session_start/` (`execute_tool` then `utter_greet`)
+- Local-first tools: `skills/<id>/tools.py` (auto-discovered)
+- Shared tools only in `tools/*.py` via `import_tools`
 - Demo backend in `lib/database.py` + `data/source/*.json`
+
+## Tool authoring
+
+- Single-skill tools → `skills/<name>/tools.py` (no `import_tools`)
+- Shared / session-start tools → `tools/*.py` + `import_tools`
+- Reference tools in plain prose (`Call run_speed_test`)
+- `@` is only for `@skill.<id>` and `@block.<id>` — never `@tool.`
+- Never name a tool the same as a skill (`factory_reset_router`, not `reset_router`)
+- Declare every `context.memory.set` key in skill or project `memory.yml`
+- Do not rely on the LLM to call zero-arg setup tools; load identity at session start
 
 ## Progressive control order
 
 prose → `tool_constraints` → scoped `if:` → verbatim `utter:` → `ordered_block`
 
-Showcase skill: `reset_router` (remote factory reset).
+Showcase skill: `reset_router` (remote factory reset via `factory_reset_router`).
 
-## Skill authoring rules
+## Model / stack
 
-- Boolean `if:` expressions use Python `True`/`False`, not YAML booleans
-- `description:` only on llm_settable / collect-owned memory fields
-- Side effects need confirmation (`requires_confirmation`) when irreversible
-- Keep voice copy short
-- Compose with `@skill.<name>` instead of growing monolithic skills
+- `rasa-pro==3.19.0.dev3` with uv prereleases
+- LLM: `gpt-5.2` — do **not** set `temperature`
+- Deepgram under `channels.inspector` in `integrations.yml`
 
 ## Secrets
 

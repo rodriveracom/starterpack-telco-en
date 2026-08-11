@@ -3,8 +3,6 @@ name: Human Handoff
 description: >
   Connect the customer to a human support agent. Activate when they ask for a
   person, representative, live agent, or say the assistant cannot help.
-import_tools:
-  - create_support_ticket
 tool_constraints:
   - create_support_ticket:
       requires: session.human_handoff.handoff_confirmed
@@ -17,5 +15,5 @@ tool_constraints:
 Help the customer reach a human agent.
 
 Ask briefly why they want a human and set `handoff_reason`.
-When ready, set `handoff_confirmed` to true and call `@tool.create_support_ticket`.
+When ready, set `handoff_confirmed` to true and call create_support_ticket.
 Share the ticket id and say a specialist will join shortly.

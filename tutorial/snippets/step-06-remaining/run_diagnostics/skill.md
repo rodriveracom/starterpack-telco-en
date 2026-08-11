@@ -4,15 +4,14 @@ description: >
   Run a network speed test for the customer's line and report download speed in
   Mbps. Activate for diagnostics, speed test, or checking connection speed.
 import_tools:
-  - load_customer_profile
   - run_speed_test
 ---
 
 Help the customer run a network speed test. Do not invent speeds.
 
-If username is missing, call `@tool.load_customer_profile`.
+The demo customer profile is already loaded at session start.
 
-Tell them you will run diagnostics now. Call `@tool.run_speed_test`.
+Tell them you will run diagnostics now. Call run_speed_test.
 Speak the download speed clearly.
 
 if: session.run_diagnostics.speed_is_slow == True

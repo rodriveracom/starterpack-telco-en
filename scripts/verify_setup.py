@@ -142,11 +142,11 @@ class Report:
 def check_python(report: Report) -> None:
     section("Python environment")
     v = sys.version_info
-    if v.major == 3 and v.minor in (11, 12):
+    if v.major == 3 and v.minor in (10, 11, 12, 13):
         ok(f"Python {v.major}.{v.minor}.{v.micro}")
     else:
         report.error(
-            f"Python {v.major}.{v.minor} detected — this project needs 3.11 or 3.12",
+            f"Python {v.major}.{v.minor} detected — this project needs 3.10–3.13",
             "uv python pin 3.12 && make install",
         )
 
@@ -315,10 +315,13 @@ def check_agent_structure(report: Report) -> None:
         report.error("No skills found under skills/*/skill.md")
     else:
         missing_frontmatter = []
+        offenders = []
         for path in skill_files:
             text = path.read_text()
             if "name:" not in text or "description:" not in text:
                 missing_frontmatter.append(path.parent.name)
+            if "@tool." in text:
+                offenders.append(path.parent.name)
         if missing_frontmatter:
             report.error(
                 f"Skills missing name/description frontmatter: {', '.join(missing_frontmatter)}",
@@ -328,15 +331,64 @@ def check_agent_structure(report: Report) -> None:
             names = ", ".join(p.parent.name for p in skill_files)
             ok(f"{len(skill_files)} skills  {DIM}({names}){RESET}")
 
-    tools_path = PROJECT_ROOT / "tools" / "telco.py"
-    if not tools_path.is_file():
-        report.error("tools/telco.py is missing")
-    else:
-        tool_count = len(re.findall(r"^@tool\(", tools_path.read_text(), re.MULTILINE))
-        if tool_count:
-            ok(f"tools/telco.py  {DIM}({tool_count} shared tools){RESET}")
+        if offenders:
+            report.error(
+                f"Invalid @tool. token in skill prose: {', '.join(offenders)}",
+                "Reference tools in plain prose (Call get_bill_summary). "
+                "@ is only for @skill.<id> and @block.<id>.",
+            )
         else:
-            report.error("tools/telco.py defines no @tool functions")
+            ok("No @tool. tokens in skill prose")
+
+    session_start = PROJECT_ROOT / "skills" / "default_session_start" / "skill.md"
+    if session_start.is_file() and "execute_tool: load_customer_profile" in session_start.read_text():
+        ok("default_session_start loads profile via execute_tool")
+    else:
+        report.error(
+            "skills/default_session_start/skill.md missing or does not execute_tool load_customer_profile",
+            "Override session start with an ordered block that loads the demo identity",
+        )
+
+    shared_tools: list[tuple[Path, int]] = []
+    zero_arg_tools: list[str] = []
+    tool_pattern = re.compile(r"^@tool\(", re.MULTILINE)
+    # Rough zero-arg detection: async def name(context... without other params before context
+    zero_arg_pattern = re.compile(
+        r"^async def (\w+)\(\s*(?:context:\s*ToolContext\s*=\s*None)?\s*\)",
+        re.MULTILINE,
+    )
+
+    for path in sorted(PROJECT_ROOT.glob("tools/*.py")):
+        text = path.read_text()
+        count = len(tool_pattern.findall(text))
+        if count:
+            shared_tools.append((path, count))
+            zero_arg_tools.extend(zero_arg_pattern.findall(text))
+
+    local_tools: list[tuple[Path, int]] = []
+    for path in sorted(PROJECT_ROOT.glob("skills/*/tools.py")):
+        text = path.read_text()
+        count = len(tool_pattern.findall(text))
+        if count:
+            local_tools.append((path, count))
+            zero_arg_tools.extend(zero_arg_pattern.findall(text))
+
+    if not shared_tools and not local_tools:
+        report.error("No @tool functions found under tools/ or skills/*/tools.py")
+    else:
+        if shared_tools:
+            detail = ", ".join(f"{p.name}={n}" for p, n in shared_tools)
+            ok(f"Shared tools  {DIM}({detail}){RESET}")
+        if local_tools:
+            detail = ", ".join(f"{p.parent.name}/tools.py={n}" for p, n in local_tools)
+            ok(f"Skill-local tools  {DIM}({detail}){RESET}")
+
+    if zero_arg_tools:
+        unique = sorted(set(zero_arg_tools))
+        info(
+            f"Zero-arg tools (ok for session execute_tool; do not rely on LLM for setup): "
+            f"{', '.join(unique)}"
+        )
 
     if (PROJECT_ROOT / "lib" / "database.py").is_file():
         ok("lib/database.py  (demo telco helpers)")
